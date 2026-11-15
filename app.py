@@ -3,11 +3,41 @@ import pandas as pd
 import numpy as np
 import joblib
 
-# Set Page Title & Configuration
-st.set_page_config(page_title="EV Range Predictor", layout="wide")
+# Set Page Configuration
+st.set_page_config(page_title="EV Range Predictor", page_icon="⚡", layout="wide")
 
-st.title("⚡ Real-World EV Range & Energy Consumption Predictor")
-st.write("Input vehicle parameters and environmental factors to estimate real-world range.")
+# Inject Custom Styling
+st.markdown("""
+    <style>
+    .main { background-color: #0E1117; }
+    .header-card {
+        background: linear-gradient(135deg, #1E2640 0%, #0F172A 100%);
+        padding: 24px;
+        border-radius: 12px;
+        border: 1px solid #334155;
+        margin-bottom: 24px;
+    }
+    .header-title { color: #38BDF8; font-size: 26px; font-weight: 700; margin: 0; }
+    .header-sub { color: #94A3B8; font-size: 14px; margin-top: 4px; }
+    .metric-card {
+        background-color: #1E293B;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 5px solid #0EA5E9;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+    .metric-title { color: #94A3B8; font-size: 13px; font-weight: 600; text-transform: uppercase; }
+    .metric-value { color: #F8FAFC; font-size: 30px; font-weight: 700; margin-top: 4px; }
+    .metric-sub { color: #38BDF8; font-size: 13px; margin-top: 4px; }
+    </style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+    <div class="header-card">
+        <h1 class="header-title">⚡ Real-World EV Range & Energy Consumption Predictor</h1>
+        <p class="header-sub">Input vehicle specifications and environmental parameters to estimate real-world range and energy consumption.</p>
+    </div>
+""", unsafe_allow_html=True)
 
 # 1. Load Trained Artifacts
 @st.cache_resource
@@ -17,7 +47,11 @@ def load_artifacts():
     feature_columns = joblib.load('feature_columns.joblib')
     return model_energy, model_range, feature_columns
 
-model_energy, model_range, feature_columns = load_artifacts()
+try:
+    model_energy, model_range, feature_columns = load_artifacts()
+except Exception as e:
+    st.error(f"Error loading model files: {e}")
+    st.stop()
 
 # 2. Sidebar Inputs for User Parameters
 st.sidebar.header("Vehicle & Trip Parameters")
@@ -38,7 +72,7 @@ make_selected = st.sidebar.selectbox("Manufacturer Make", options=["Tata", "MG",
 road_type_selected = st.sidebar.selectbox("Road / City Type", options=["Delhi", "Mumbai", "Pune", "Highway_NH", "Expressway", "Ghat_Road"])
 
 # 3. Predict Button & Logic
-if st.button("Predict Range"):
+if st.sidebar.button("Predict Range", type="primary"):
     # Create input dictionary with default 0s for all feature columns
     input_data = {col: 0 for col in feature_columns}
 
@@ -66,10 +100,45 @@ if st.button("Predict Range"):
     input_df = pd.DataFrame([input_data])[feature_columns]
 
     # Predict
-    pred_energy = model_energy.predict(input_df)[0]
-    pred_range = model_range.predict(input_df)[0]
+    pred_energy = float(model_energy.predict(input_df)[0])
+    pred_range = float(model_range.predict(input_df)[0])
 
-    # Display Metrics
-    col1, col2 = st.columns(2)
-    col1.metric(label="Estimated Real-World Range", value=f"{pred_range:.1f} km")
-    col2.metric(label="Energy Consumption", value=f"{pred_energy:.3f} kWh/km")
+    range_loss = certified_range - pred_range
+    degradation_pct = (range_loss / certified_range) * 100
+
+    # Display Metrics in Styled Columns
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-title">Estimated Real-World Range</div>
+                <div class="metric-value">{pred_range:.1f} km</div>
+                <div class="metric-sub">Certified: {certified_range} km</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    with col2:
+        st.markdown(f"""
+            <div class="metric-card" style="border-left-color: #F59E0B;">
+                <div class="metric-title">Energy Consumption</div>
+                <div class="metric-value">{pred_energy:.3f}</div>
+                <div class="metric-sub">kWh per kilometer</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+            <div class="metric-card" style="border-left-color: #EF4444;">
+                <div class="metric-title">Range Deficit</div>
+                <div class="metric-value">-{range_loss:.1f} km</div>
+                <div class="metric-sub">-{degradation_pct:.1f}% vs Certified Rating</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Retained Efficiency Bar
+    retained_pct = max(0.0, min(1.0, pred_range / certified_range))
+    st.write(f"**Retained Range Efficiency:** {retained_pct * 100:.1f}%")
+    st.progress(retained_pct)
