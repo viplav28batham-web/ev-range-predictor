@@ -176,7 +176,7 @@ hero_col1, hero_col2 = st.columns([3, 1])
 
 with hero_col1:
     st.markdown("""
-        <div class="pill-tag">✦ AI / ML PROJECT</div>
+        <div class="pill-tag">✦ DS / ML PROJECT</div>
         <h1 class="hero-title">EV Performance Predictor.</h1>
         <p class="hero-subtitle">Discover insights into real-world electric vehicle performance through Machine Learning. Enter vehicle specs and trip parameters to compute exact range and energy consumption.</p>
     """, unsafe_allow_html=True)
